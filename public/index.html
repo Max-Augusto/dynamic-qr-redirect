@@ -4,14 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Dinâmico — Gerador & Gerenciador Inteligente</title>
-  <meta name="description" content="Crie QR Codes dinâmicos que nunca expiram. Altere o destino a qualquer momento com pré-visualização ao vivo e download em alta resolução.">
+  <meta name="description" content="Crie e gerencie QR Codes dinâmicos que nunca expiram. Altere a URL de destino a qualquer momento ou carregue uma imagem de QR Code existente para editar.">
   <meta property="og:title" content="QR Dinâmico">
   <meta property="og:description" content="Gere e gerencie QR Codes dinâmicos com alteração instantânea de link.">
 
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- jsQR for instant client-side QR Code decoding from images -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
     :root {
@@ -31,6 +34,8 @@
       
       --success: #10b981;
       --success-bg: #ecfdf5;
+      --danger: #ef4444;
+      --danger-bg: #fef2f2;
       
       --radius-lg: 14px;
       --radius-md: 10px;
@@ -119,6 +124,12 @@
       font-weight: 500;
     }
 
+    .header-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .header-badge {
       display: inline-flex;
       align-items: center;
@@ -152,10 +163,15 @@
 
     /* Hero / Intro */
     .page-head {
-      margin-bottom: 28px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
-    .page-head h1 {
+    .page-head-text h1 {
       font-size: 1.7rem;
       font-weight: 800;
       letter-spacing: -0.03em;
@@ -163,9 +179,38 @@
       margin-bottom: 4px;
     }
 
-    .page-head p {
+    .page-head-text p {
       color: var(--text-muted);
       font-size: 0.95rem;
+    }
+
+    .mode-switch-pills {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: var(--radius-md);
+      gap: 2px;
+    }
+
+    .pill-btn {
+      padding: 8px 16px;
+      border: none;
+      background: transparent;
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .pill-btn.active {
+      background: #ffffff;
+      color: var(--text-main);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     }
 
     /* Two-Column Studio Layout */
@@ -222,6 +267,26 @@
     .card-subtitle {
       font-size: 0.8rem;
       color: var(--text-muted);
+    }
+
+    .btn-card-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-card-back:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
     }
 
     /* Form Elements */
@@ -327,6 +392,57 @@
       box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
     }
 
+    /* Import / Load Existing QR Section */
+    .qr-dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: var(--radius-md);
+      padding: 30px 20px;
+      text-align: center;
+      background: #fafafa;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 20px;
+    }
+
+    .qr-dropzone:hover, .qr-dropzone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-subtle);
+    }
+
+    .dropzone-icon {
+      width: 46px;
+      height: 46px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      color: var(--primary);
+      margin-bottom: 12px;
+    }
+
+    .divider-or {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 18px 0;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .divider-or::before, .divider-or::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .divider-or span {
+      padding: 0 10px;
+    }
+
     /* Live Preview Panel (Right Card) */
     .preview-card {
       display: flex;
@@ -376,13 +492,13 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-      margin-bottom: 18px;
+      margin-bottom: 16px;
       position: relative;
     }
 
     .qr-frame img {
-      width: 190px;
-      height: 190px;
+      width: 185px;
+      height: 185px;
       display: block;
       border-radius: 4px;
     }
@@ -403,13 +519,17 @@
     }
 
     .live-target-badge {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: var(--text-muted);
       max-width: 90%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
+      background: #f8fafc;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
     }
 
     .preview-action-grid {
@@ -452,6 +572,18 @@
       background: #dbeafe;
     }
 
+    .btn-tool.reset {
+      grid-column: span 2;
+      background: #f8fafc;
+      color: var(--text-muted);
+      border-color: var(--border);
+    }
+
+    .btn-tool.reset:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
     /* List of Created QR Codes */
     .history-section {
       margin-top: 8px;
@@ -462,6 +594,8 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .history-title {
@@ -493,6 +627,11 @@
       align-items: center;
       box-shadow: var(--shadow-card);
       transition: all 0.15s ease;
+    }
+
+    .link-item-card.selected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
     }
 
     .link-item-card:hover {
@@ -691,7 +830,7 @@
       border: none;
       color: var(--text-muted);
       cursor: pointer;
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       padding: 4px;
     }
 
@@ -792,9 +931,11 @@
           <span class="brand-sub">Redirecionador em tempo real</span>
         </div>
       </a>
-      <div class="header-badge">
-        <span class="status-dot"></span>
-        <span>QR Permanente Ativo</span>
+      <div class="header-nav-actions">
+        <div class="header-badge">
+          <span class="status-dot"></span>
+          <span>QR Permanente Ativo</span>
+        </div>
       </div>
     </div>
   </header>
@@ -803,76 +944,145 @@
   <main>
     
     <div class="page-head">
-      <h1>Gerador de QR Code Dinâmico</h1>
-      <p>O QR Code gerado é permanente e nunca precisará ser reimpresso. Você pode atualizar o link de destino quando quiser.</p>
+      <div class="page-head-text">
+        <h1>Gerenciador de QR Code Dinâmico</h1>
+        <p>O QR Code impresso nunca muda. Altere a URL de destino quando quiser ou carregue um QR Code para editar.</p>
+      </div>
+
+      <!-- Mode Switch Pills: Criar Novo vs Carregar Existente -->
+      <div class="mode-switch-pills">
+        <button type="button" class="pill-btn active" id="tabModeCreate">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Criar Novo QR
+        </button>
+        <button type="button" class="pill-btn" id="tabModeImport">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Carregar Imagem / Buscar
+        </button>
+      </div>
     </div>
 
     <!-- 2-Column Studio Grid -->
     <div class="studio-grid">
       
-      <!-- Column 1: Configurator -->
-      <section class="card" id="configCard">
-        <div class="card-header">
-          <div class="card-title-wrap">
-            <span class="card-step-badge">1</span>
-            <div>
-              <h2 class="card-title">Configurar Destino</h2>
-              <span class="card-subtitle">Informe para onde o QR Code deve apontar</span>
+      <!-- Column 1: Configurator OR QR Image Decoder -->
+      <section class="card" id="leftCard">
+        
+        <!-- View A: Create Form -->
+        <div id="createView">
+          <div class="card-header">
+            <div class="card-title-wrap">
+              <span class="card-step-badge">1</span>
+              <div>
+                <h2 class="card-title">Configurar Novo Destino</h2>
+                <span class="card-subtitle">Informe para onde o QR Code deve apontar</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <form id="createForm">
-          
-          <div class="form-group">
-            <label class="form-label" for="targetUrlInput">
-              <span>Link de Destino <b style="color:var(--primary);">*</b></span>
-              <span class="sub">URL para redirecionar</span>
-            </label>
-            <input 
-              type="url" 
-              id="targetUrlInput" 
-              class="input-field" 
-              placeholder="https://exemplo.com/meu-cardapio-ou-link" 
-              required
-              autocomplete="off"
-            >
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="titleInput">
-              <span>Título / Identificação</span>
-              <span class="sub">Opcional</span>
-            </label>
-            <input 
-              type="text" 
-              id="titleInput" 
-              class="input-field" 
-              placeholder="Ex.: Cardápio da Loja, Catálogo PDF, Portfólio"
-            >
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="slugInput">
-              <span>Slug / Código Curto</span>
-              <span class="sub">Opcional</span>
-            </label>
-            <div class="slug-input-box">
-              <span class="slug-prefix">/q/</span>
+          <form id="createForm">
+            <div class="form-group">
+              <label class="form-label" for="targetUrlInput">
+                <span>Link de Destino <b style="color:var(--primary);">*</b></span>
+                <span class="sub">URL para redirecionar</span>
+              </label>
               <input 
-                type="text" 
-                id="slugInput" 
-                placeholder="ex: cardapio-2026" 
-                pattern="[A-Za-z0-9-_]+"
+                type="url" 
+                id="targetUrlInput" 
+                class="input-field" 
+                placeholder="https://exemplo.com/meu-cardapio-ou-link" 
+                required
+                autocomplete="off"
               >
             </div>
+
+            <div class="form-group">
+              <label class="form-label" for="titleInput">
+                <span>Título / Identificação</span>
+                <span class="sub">Opcional</span>
+              </label>
+              <input 
+                type="text" 
+                id="titleInput" 
+                class="input-field" 
+                placeholder="Ex.: Cardápio da Loja, Catálogo PDF, Portfólio"
+              >
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="slugInput">
+                <span>Slug / Código Curto</span>
+                <span class="sub">Opcional</span>
+              </label>
+              <div class="slug-input-box">
+                <span class="slug-prefix">/q/</span>
+                <input 
+                  type="text" 
+                  id="slugInput" 
+                  placeholder="ex: cardapio-2026" 
+                  pattern="[A-Za-z0-9-_]+"
+                >
+              </div>
+            </div>
+
+            <button type="submit" class="btn-submit-main" id="btnSubmit">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Gerar QR Code Dinâmico
+            </button>
+          </form>
+        </div>
+
+        <!-- View B: Import / Decode QR Code from Image or Link -->
+        <div id="importView" style="display: none;">
+          <div class="card-header">
+            <div class="card-title-wrap">
+              <span class="card-step-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              </span>
+              <div>
+                <h2 class="card-title">Carregar QR Code para Editar</h2>
+                <span class="card-subtitle">Identifica o código e abre para troca imediata da URL</span>
+              </div>
+            </div>
           </div>
 
-          <button type="submit" class="btn-submit-main" id="btnSubmit">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Gerar QR Code Dinâmico
-          </button>
-        </form>
+          <!-- Dropzone for QR image -->
+          <div class="qr-dropzone" id="qrDropzone">
+            <div class="dropzone-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M7 7h.01M7 17h.01M17 7h.01M17 17h.01M12 12h.01"></path></svg>
+            </div>
+            <p style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
+              Clique ou arraste a imagem do seu QR Code aqui
+            </p>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">
+              PNG, JPG, WebP ou print do QR Code gerado pelo site
+            </p>
+            <input type="file" id="fileInputQr" accept="image/*" style="display: none;">
+          </div>
+
+          <div class="divider-or">
+            <span>OU DIGITE O LINK / SLUG</span>
+          </div>
+
+          <form id="searchSlugForm">
+            <div class="form-group">
+              <div class="slug-input-box">
+                <span class="slug-prefix">/q/</span>
+                <input 
+                  type="text" 
+                  id="searchSlugInput" 
+                  placeholder="Cole o link ou código (ex: cardapio)" 
+                  required
+                >
+              </div>
+            </div>
+            <button type="submit" class="btn-submit-main" style="margin-top: 10px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              Localizar &amp; Abrir para Edição
+            </button>
+          </form>
+        </div>
+
       </section>
 
       <!-- Column 2: Live QR Preview & Actions -->
@@ -881,20 +1091,28 @@
           <div class="card-title-wrap">
             <span class="card-step-badge">2</span>
             <div>
-              <h2 class="card-title">Pré-visualização do QR</h2>
+              <h2 class="card-title" id="previewHeaderTitle">Pré-visualização do QR</h2>
               <span class="card-subtitle">Download &amp; Teste em Tempo Real</span>
             </div>
           </div>
+
+          <!-- Botão de Voltar / Limpar Seleção -->
+          <button type="button" class="btn-card-back" id="btnBackToInitial" style="display: none;" title="Voltar ao início">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            Fechar seleção
+          </button>
         </div>
 
+        <!-- Empty State -->
         <div id="qrEmptyState" class="qr-empty-state">
           <div class="empty-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M7 7h.01M7 17h.01M17 7h.01M17 17h.01M12 12h.01"></path></svg>
           </div>
-          <p style="font-size:0.92rem;font-weight:600;color:var(--text-main);margin-bottom:4px;">Aguardando Configuração</p>
-          <p style="font-size:0.82rem;color:var(--text-muted);">Preencha o link ao lado para gerar ou selecione um item da lista abaixo.</p>
+          <p style="font-size:0.92rem;font-weight:600;color:var(--text-main);margin-bottom:4px;">Aguardando Seleção ou Criação</p>
+          <p style="font-size:0.82rem;color:var(--text-muted);">Preencha o link ao lado para gerar ou selecione um QR Code da lista abaixo.</p>
         </div>
 
+        <!-- Ready State -->
         <div id="qrReadyState" class="qr-ready-container" style="display:none;">
           <div class="qr-frame">
             <img id="previewQrImg" src="" alt="QR Code Dinâmico">
@@ -929,6 +1147,10 @@
             <button type="button" class="btn-tool accent" id="btnQuickEditDest">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               Alterar Link de Destino deste QR
+            </button>
+            <button type="button" class="btn-tool reset" id="btnResetPreviewBottom">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              Voltar / Limpar Seleção
             </button>
           </div>
         </div>
@@ -966,7 +1188,7 @@
           <div class="modal-info-box">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--primary);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
             <div>
-              <strong>O QR Code impresso não muda.</strong> Ao salvar, o redirecionamento passa a levar para a nova URL instantaneamente.
+              <strong>O QR Code impresso não muda.</strong> Ao salvar, qualquer leitura do código será redirecionada imediatamente para o novo destino abaixo.
             </div>
           </div>
 
@@ -996,16 +1218,32 @@
     let activeLink = null;
     let editingId = null;
 
+    // Tabs
+    const tabModeCreate = document.getElementById("tabModeCreate");
+    const tabModeImport = document.getElementById("tabModeImport");
+    const createView = document.getElementById("createView");
+    const importView = document.getElementById("importView");
+
+    // Forms
     const createForm = document.getElementById("createForm");
     const targetUrlInput = document.getElementById("targetUrlInput");
     const titleInput = document.getElementById("titleInput");
     const slugInput = document.getElementById("slugInput");
 
+    // Dropzone & Decoder
+    const qrDropzone = document.getElementById("qrDropzone");
+    const fileInputQr = document.getElementById("fileInputQr");
+    const searchSlugForm = document.getElementById("searchSlugForm");
+    const searchSlugInput = document.getElementById("searchSlugInput");
+
+    // Preview
     const qrEmptyState = document.getElementById("qrEmptyState");
     const qrReadyState = document.getElementById("qrReadyState");
     const previewQrImg = document.getElementById("previewQrImg");
     const previewShortText = document.getElementById("previewShortText");
     const previewTargetBadge = document.getElementById("previewTargetBadge");
+    const btnBackToInitial = document.getElementById("btnBackToInitial");
+    const btnResetPreviewBottom = document.getElementById("btnResetPreviewBottom");
 
     const btnCopyShort = document.getElementById("btnCopyShort");
     const btnDownloadPng = document.getElementById("btnDownloadPng");
@@ -1013,9 +1251,11 @@
     const btnTestRedirect = document.getElementById("btnTestRedirect");
     const btnQuickEditDest = document.getElementById("btnQuickEditDest");
 
+    // List
     const linksList = document.getElementById("linksList");
     const historyCount = document.getElementById("historyCount");
 
+    // Modal
     const editModal = document.getElementById("editModal");
     const editForm = document.getElementById("editForm");
     const editTitleInput = document.getElementById("editTitleInput");
@@ -1023,12 +1263,27 @@
     const btnCloseEditModal = document.getElementById("btnCloseEditModal");
     const btnCancelEdit = document.getElementById("btnCancelEdit");
 
+    // Mode Toggle Tabs
+    tabModeCreate.addEventListener("click", () => {
+      tabModeCreate.classList.add("active");
+      tabModeImport.classList.remove("active");
+      createView.style.display = "block";
+      importView.style.display = "none";
+    });
+
+    tabModeImport.addEventListener("click", () => {
+      tabModeImport.classList.add("active");
+      tabModeCreate.classList.remove("active");
+      createView.style.display = "none";
+      importView.style.display = "block";
+    });
+
     function toast(text) {
       const el = document.createElement("div");
       el.className = "toast-message";
       el.textContent = text;
       document.getElementById("toastContainer").appendChild(el);
-      setTimeout(() => el.remove(), 2600);
+      setTimeout(() => el.remove(), 2800);
     }
 
     function esc(s) {
@@ -1065,9 +1320,10 @@
       linksList.innerHTML = links.map(link => {
         const fullShortUrl = `${proto}//${host}/q/${encodeURIComponent(link.id)}`;
         const qrThumbUrl = `/q/${encodeURIComponent(link.id)}/qr?size=3`;
+        const isSelected = activeLink && activeLink.id === link.id;
 
         return `
-          <div class="link-item-card" id="item-${esc(link.id)}">
+          <div class="link-item-card ${isSelected ? 'selected' : ''}" id="item-${esc(link.id)}">
             <div class="item-qr-preview" onclick="selectLink('${esc(link.id)}')" title="Visualizar este QR">
               <img src="${qrThumbUrl}" alt="QR">
             </div>
@@ -1101,6 +1357,17 @@
       }).join("");
     }
 
+    function resetPreview() {
+      activeLink = null;
+      qrReadyState.style.display = "none";
+      qrEmptyState.style.display = "flex";
+      btnBackToInitial.style.display = "none";
+      renderLinks();
+    }
+
+    btnBackToInitial.addEventListener("click", resetPreview);
+    btnResetPreviewBottom.addEventListener("click", resetPreview);
+
     function selectLink(id) {
       const link = links.find(l => l.id === id);
       if (!link) return;
@@ -1130,6 +1397,9 @@
 
       qrEmptyState.style.display = "none";
       qrReadyState.style.display = "flex";
+      btnBackToInitial.style.display = "inline-flex";
+
+      renderLinks();
     }
 
     createForm.addEventListener("submit", async e => {
@@ -1161,6 +1431,106 @@
         toast("Erro ao conectar ao servidor");
       }
     });
+
+    // Dropzone & QR decoding from image
+    qrDropzone.addEventListener("click", () => fileInputQr.click());
+    
+    qrDropzone.addEventListener("dragover", e => {
+      e.preventDefault();
+      qrDropzone.classList.add("dragover");
+    });
+
+    qrDropzone.addEventListener("dragleave", () => {
+      qrDropzone.classList.remove("dragover");
+    });
+
+    qrDropzone.addEventListener("drop", e => {
+      e.preventDefault();
+      qrDropzone.classList.remove("dragover");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        decodeQrFromFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInputQr.addEventListener("change", e => {
+      if (e.target.files && e.target.files[0]) {
+        decodeQrFromFile(e.target.files[0]);
+      }
+    });
+
+    function decodeQrFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+          const imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+          if (typeof jsQR !== "undefined") {
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code && code.data) {
+              handleDecodedUrl(code.data);
+            } else {
+              toast("Não foi possível ler o QR Code nesta imagem. Tente outra imagem.");
+            }
+          } else {
+            toast("Leitor de QR indisponível no momento.");
+          }
+        };
+        img.src = evt.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function extractSlug(raw) {
+      let trimmed = raw.trim();
+      // Look for /q/slug or slug directly
+      if (trimmed.includes("/q/")) {
+        const parts = trimmed.split("/q/");
+        return parts[parts.length - 1].split("/")[0].split("?")[0];
+      }
+      if (trimmed.startsWith("http")) {
+        try {
+          const u = new URL(trimmed);
+          const path = u.pathname.replace(/^\/+/, "");
+          if (path.startsWith("q/")) return path.slice(2);
+          return path;
+        } catch(e) {}
+      }
+      return trimmed.replace(/^\/q\//, "").replace(/^\//, "");
+    }
+
+    function handleDecodedUrl(raw) {
+      const slug = extractSlug(raw);
+      if (!slug) {
+        toast("Código não identificado");
+        return;
+      }
+      findAndOpenLink(slug);
+    }
+
+    searchSlugForm.addEventListener("submit", e => {
+      e.preventDefault();
+      const val = searchSlugInput.value.trim();
+      if (!val) return;
+      const slug = extractSlug(val);
+      findAndOpenLink(slug);
+    });
+
+    function findAndOpenLink(slug) {
+      const link = links.find(l => l.id.toLowerCase() === slug.toLowerCase());
+      if (link) {
+        toast(`QR Code "${link.title}" localizado com sucesso!`);
+        selectLink(link.id);
+        openEditModal(link.id);
+      } else {
+        toast(`QR Code com código "${slug}" não encontrado no sistema.`);
+      }
+    }
 
     window.openEditModal = id => {
       const link = links.find(l => l.id === id);
@@ -1217,9 +1587,7 @@
         toast("QR Code excluído");
         await loadLinks();
         if (activeLink && activeLink.id === id) {
-          qrReadyState.style.display = "none";
-          qrEmptyState.style.display = "flex";
-          activeLink = null;
+          resetPreview();
         }
       } catch (err) {
         toast("Erro ao excluir");

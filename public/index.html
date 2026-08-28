@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Dinâmico — Gerador & Gerenciador Inteligente</title>
+  <meta name="description" content="Crie QR Codes dinâmicos que nunca expiram. Altere o destino a qualquer momento com pré-visualização ao vivo e download em alta resolução.">
+  <meta property="og:title" content="QR Dinâmico">
+  <meta property="og:description" content="Gere e gerencie QR Codes dinâmicos com alteração instantânea de link.">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-subtle: #eff6ff;
+      --primary-border: #bfdbfe;
+      
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      
+      --border: #e2e8f0;
+      --border-focus: #3b82f6;
+      
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
+
+      --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+      --shadow-hover: 0 10px 25px -3px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    /* Top Navigation */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-main);
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: var(--text-main);
+      color: #ffffff;
+      border-radius: var(--radius-md);
+      display: grid;
+      place-items: center;
+      font-size: 1.15rem;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+    }
+
+    .brand-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .brand-sub {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--success);
+      background: var(--success-bg);
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid #a7f3d0;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--success);
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+      flex: 1;
+    }
+
+    /* Hero / Intro */
+    .page-head {
+      margin-bottom: 28px;
+    }
+
+    .page-head h1 {
+      font-size: 1.7rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .page-head p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Two-Column Studio Layout */
+    .studio-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.95fr;
+      gap: 24px;
+      align-items: start;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .card-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-step-badge {
+      width: 26px;
+      height: 26px;
+      background: var(--text-main);
+      color: #ffffff;
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .card-title {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .card-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Form Elements */
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 7px;
+    }
+
+    .form-label .sub {
+      color: var(--text-dim);
+      font-weight: 400;
+      font-size: 0.78rem;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 0.92rem;
+      background: #ffffff;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+
+    .input-field:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .input-field::placeholder {
+      color: #cbd5e1;
+    }
+
+    .slug-input-box {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: #ffffff;
+      transition: all 0.15s ease;
+    }
+
+    .slug-input-box:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .slug-prefix {
+      background: #f8fafc;
+      padding: 12px 14px;
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      border-right: 1px solid var(--border);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .slug-input-box input {
+      flex: 1;
+      padding: 12px 14px;
+      border: none;
+      outline: none;
+      font-size: 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+    }
+
+    .btn-submit-main {
+      width: 100%;
+      padding: 13px;
+      background: var(--text-main);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 24px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+    }
+
+    .btn-submit-main:hover {
+      background: #000000;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+    }
+
+    /* Live Preview Panel (Right Card) */
+    .preview-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      min-height: 440px;
+      position: relative;
+    }
+
+    .qr-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 320px;
+      width: 100%;
+      border: 1px dashed #cbd5e1;
+      border-radius: var(--radius-md);
+      padding: 32px;
+      background: #fafafa;
+    }
+
+    .empty-icon {
+      width: 52px;
+      height: 52px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+
+    .qr-ready-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .qr-frame {
+      background: #ffffff;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+      margin-bottom: 18px;
+      position: relative;
+    }
+
+    .qr-frame img {
+      width: 190px;
+      height: 190px;
+      display: block;
+      border-radius: 4px;
+    }
+
+    .permanent-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .live-target-badge {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 20px;
+    }
+
+    .preview-action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .btn-tool {
+      padding: 10px 14px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-tool:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .btn-tool.accent {
+      grid-column: span 2;
+      background: var(--primary-subtle);
+      border-color: var(--primary-border);
+      color: var(--primary);
+    }
+
+    .btn-tool.accent:hover {
+      background: #dbeafe;
+    }
+
+    /* List of Created QR Codes */
+    .history-section {
+      margin-top: 8px;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .history-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .history-count {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .links-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .link-item-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+      display: grid;
+      grid-template-columns: 58px 1fr auto;
+      gap: 20px;
+      align-items: center;
+      box-shadow: var(--shadow-card);
+      transition: all 0.15s ease;
+    }
+
+    .link-item-card:hover {
+      border-color: #cbd5e1;
+      box-shadow: var(--shadow-hover);
+    }
+
+    .item-qr-preview {
+      width: 58px;
+      height: 58px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: transform 0.15s;
+    }
+
+    .item-qr-preview:hover {
+      transform: scale(1.05);
+      border-color: var(--primary);
+    }
+
+    .item-qr-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .item-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .item-top-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .item-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .item-slug-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: var(--text-main);
+      padding: 2px 8px;
+      border-radius: 5px;
+    }
+
+    .item-target-url {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-target-url a {
+      color: var(--text-muted);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-target-url a:hover {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+
+    .item-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scan-pill {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+    }
+
+    .btn-edit-target {
+      background: var(--primary-subtle);
+      color: var(--primary);
+      border: 1px solid var(--primary-border);
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .btn-edit-target:hover {
+      background: #dbeafe;
+    }
+
+    .btn-icon-btn {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 7px 9px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .btn-icon-btn:hover {
+      background: #f8fafc;
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    .btn-icon-btn.danger:hover {
+      background: #fef2f2;
+      border-color: #fca5a5;
+      color: #ef4444;
+    }
+
+    /* Clean Destination Edit Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.15);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .modal-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px;
+    }
+
+    .modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-body {
+      padding: 22px;
+    }
+
+    .modal-info-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .modal-footer {
+      padding: 14px 22px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .toast-message {
+      background: var(--text-main);
+      color: #ffffff;
+      padding: 11px 18px;
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
+      font-weight: 500;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 860px) {
+      .studio-grid {
+        grid-template-columns: 1fr;
+      }
+      .link-item-card {
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      .item-qr-preview {
+        display: none;
+      }
+      .item-actions {
+        flex-wrap: wrap;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="header-inner">
+      <a href="/" class="brand">
+        <div class="brand-icon">❖</div>
+        <div class="brand-info">
+          <span class="brand-title">QR Dinâmico</span>
+          <span class="brand-sub">Redirecionador em tempo real</span>
+        </div>
+      </a>
+      <div class="header-badge">
+        <span class="status-dot"></span>
+        <span>QR Permanente Ativo</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main>
+    
+    <div class="page-head">
+      <h1>Gerador de QR Code Dinâmico</h1>
+      <p>O QR Code gerado é permanente e nunca precisará ser reimpresso. Você pode atualizar o link de destino quando quiser.</p>
+    </div>
+
+    <!-- 2-Column Studio Grid -->
+    <div class="studio-grid">
+      
+      <!-- Column 1: Configurator -->
+      <section class="card" id="configCard">
+        <div class="card-header">
+          <div class="card-title-wrap">
+            <span class="card-step-badge">1</span>
+            <div>
+              <h2 class="card-title">Configurar Destino</h2>
+              <span class="card-subtitle">Informe para onde o QR Code deve apontar</span>
+            </div>
+          </div>
+        </div>
+
+        <form id="createForm">
+          
+          <div class="form-group">
+            <label class="form-label" for="targetUrlInput">
+              <span>Link de Destino <b style="color:var(--primary);">*</b></span>
+              <span class="sub">URL para redirecionar</span>
+            </label>
+            <input 
+              type="url" 
+              id="targetUrlInput" 
+              class="input-field" 
+              placeholder="https://exemplo.com/meu-cardapio-ou-link" 
+              required
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="titleInput">
+              <span>Título / Identificação</span>
+              <span class="sub">Opcional</span>
+            </label>
+            <input 
+              type="text" 
+              id="titleInput" 
+              class="input-field" 
+              placeholder="Ex.: Cardápio da Loja, Catálogo PDF, Portfólio"
+            >
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="slugInput">
+              <span>Slug / Código Curto</span>
+              <span class="sub">Opcional</span>
+            </label>
+            <div class="slug-input-box">
+              <span class="slug-prefix">/q/</span>
+              <input 
+                type="text" 
+                id="slugInput" 
+                placeholder="ex: cardapio-2026" 
+                pattern="[A-Za-z0-9-_]+"
+              >
+            </div>
+          </div>
+
+          <button type="submit" class="btn-submit-main" id="btnSubmit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Gerar QR Code Dinâmico
+          </button>
+        </form>
+      </section>
+
+      <!-- Column 2: Live QR Preview & Actions -->
+      <section class="card preview-card" id="previewCard">
+        <div class="card-header" style="width:100%;">
+          <div class="card-title-wrap">
+            <span class="card-step-badge">2</span>
+            <div>
+              <h2 class="card-title">Pré-visualização do QR</h2>
+              <span class="card-subtitle">Download &amp; Teste em Tempo Real</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="qrEmptyState" class="qr-empty-state">
+          <div class="empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M7 7h.01M7 17h.01M17 7h.01M17 17h.01M12 12h.01"></path></svg>
+          </div>
+          <p style="font-size:0.92rem;font-weight:600;color:var(--text-main);margin-bottom:4px;">Aguardando Configuração</p>
+          <p style="font-size:0.82rem;color:var(--text-muted);">Preencha o link ao lado para gerar ou selecione um item da lista abaixo.</p>
+        </div>
+
+        <div id="qrReadyState" class="qr-ready-container" style="display:none;">
+          <div class="qr-frame">
+            <img id="previewQrImg" src="" alt="QR Code Dinâmico">
+          </div>
+
+          <div class="permanent-pill">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span id="previewShortText">/q/exemplo</span>
+          </div>
+
+          <div class="live-target-badge" id="previewTargetBadge">
+            Destino: https://exemplo.com
+          </div>
+
+          <div class="preview-action-grid">
+            <button type="button" class="btn-tool" id="btnCopyShort">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              Copiar Link
+            </button>
+            <button type="button" class="btn-tool" id="btnDownloadPng">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Baixar PNG (HD)
+            </button>
+            <button type="button" class="btn-tool" id="btnDownloadSvg">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              Baixar SVG
+            </button>
+            <button type="button" class="btn-tool" id="btnTestRedirect">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              Testar Acesso
+            </button>
+            <button type="button" class="btn-tool accent" id="btnQuickEditDest">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              Alterar Link de Destino deste QR
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- History / Management Section -->
+    <section class="history-section">
+      <div class="history-header">
+        <div>
+          <h2 class="history-title">Seus QR Codes Ativos</h2>
+          <p style="font-size:0.84rem;color:var(--text-muted);">Clique em um QR Code para pré-visualizar ou editar seu destino final.</p>
+        </div>
+        <span class="history-count" id="historyCount">0 links</span>
+      </div>
+
+      <div class="links-grid" id="linksList">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Edit Destination Modal -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="editModalHeaderTitle">Alterar Link de Destino</h3>
+        <button type="button" class="modal-close" id="btnCloseEditModal">&times;</button>
+      </div>
+
+      <form id="editForm">
+        <div class="modal-body">
+          <div class="modal-info-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--primary);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <div>
+              <strong>O QR Code impresso não muda.</strong> Ao salvar, o redirecionamento passa a levar para a nova URL instantaneamente.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="editTitleInput">Título / Nome</label>
+            <input type="text" id="editTitleInput" class="input-field" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="editTargetUrlInput">Novo Link de Destino</label>
+            <input type="url" id="editTargetUrlInput" class="input-field" placeholder="https://novo-destino.com" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-tool" id="btnCancelEdit">Cancelar</button>
+          <button type="submit" class="btn-submit-main" style="width:auto;margin:0;padding:9px 20px;">Salvar Novo Destino</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    let links = [];
+    let activeLink = null;
+    let editingId = null;
+
+    const createForm = document.getElementById("createForm");
+    const targetUrlInput = document.getElementById("targetUrlInput");
+    const titleInput = document.getElementById("titleInput");
+    const slugInput = document.getElementById("slugInput");
+
+    const qrEmptyState = document.getElementById("qrEmptyState");
+    const qrReadyState = document.getElementById("qrReadyState");
+    const previewQrImg = document.getElementById("previewQrImg");
+    const previewShortText = document.getElementById("previewShortText");
+    const previewTargetBadge = document.getElementById("previewTargetBadge");
+
+    const btnCopyShort = document.getElementById("btnCopyShort");
+    const btnDownloadPng = document.getElementById("btnDownloadPng");
+    const btnDownloadSvg = document.getElementById("btnDownloadSvg");
+    const btnTestRedirect = document.getElementById("btnTestRedirect");
+    const btnQuickEditDest = document.getElementById("btnQuickEditDest");
+
+    const linksList = document.getElementById("linksList");
+    const historyCount = document.getElementById("historyCount");
+
+    const editModal = document.getElementById("editModal");
+    const editForm = document.getElementById("editForm");
+    const editTitleInput = document.getElementById("editTitleInput");
+    const editTargetUrlInput = document.getElementById("editTargetUrlInput");
+    const btnCloseEditModal = document.getElementById("btnCloseEditModal");
+    const btnCancelEdit = document.getElementById("btnCancelEdit");
+
+    function toast(text) {
+      const el = document.createElement("div");
+      el.className = "toast-message";
+      el.textContent = text;
+      document.getElementById("toastContainer").appendChild(el);
+      setTimeout(() => el.remove(), 2600);
+    }
+
+    function esc(s) {
+      return String(s || "").replace(/[&<>'"]/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+      }[c]));
+    }
+
+    async function loadLinks() {
+      try {
+        const res = await fetch("/api/links");
+        links = await res.json();
+        renderLinks();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderLinks() {
+      historyCount.textContent = `${links.length} ${links.length === 1 ? "QR Code" : "QR Codes"}`;
+
+      if (!links.length) {
+        linksList.innerHTML = `
+          <div style="background:#ffffff;border:1px dashed var(--border);border-radius:var(--radius-lg);padding:36px;text-align:center;color:var(--text-muted);">
+            Nenhum QR Code criado ainda. Utilize o formulário acima para gerar o primeiro.
+          </div>
+        `;
+        return;
+      }
+
+      const host = window.location.host;
+      const proto = window.location.protocol;
+
+      linksList.innerHTML = links.map(link => {
+        const fullShortUrl = `${proto}//${host}/q/${encodeURIComponent(link.id)}`;
+        const qrThumbUrl = `/q/${encodeURIComponent(link.id)}/qr?size=3`;
+
+        return `
+          <div class="link-item-card" id="item-${esc(link.id)}">
+            <div class="item-qr-preview" onclick="selectLink('${esc(link.id)}')" title="Visualizar este QR">
+              <img src="${qrThumbUrl}" alt="QR">
+            </div>
+
+            <div class="item-meta">
+              <div class="item-top-line">
+                <span class="item-name">${esc(link.title)}</span>
+                <span class="item-slug-badge">/q/${esc(link.id)}</span>
+              </div>
+              <div class="item-target-url">
+                <span>Destino:</span>
+                <a href="${esc(link.target_url)}" target="_blank" rel="noopener noreferrer">${esc(link.target_url)}</a>
+              </div>
+            </div>
+
+            <div class="item-actions">
+              <span class="scan-pill">${link.clicks || 0} scans</span>
+              <button class="btn-edit-target" onclick="openEditModal('${esc(link.id)}')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Alterar Destino
+              </button>
+              <button class="btn-icon-btn" onclick="copyText('${fullShortUrl}')" title="Copiar link curto">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+              <button class="btn-icon-btn danger" onclick="deleteLink('${esc(link.id)}')" title="Excluir">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function selectLink(id) {
+      const link = links.find(l => l.id === id);
+      if (!link) return;
+      activeLink = link;
+
+      const host = window.location.host;
+      const proto = window.location.protocol;
+      const fullUrl = `${proto}//${host}/q/${encodeURIComponent(link.id)}`;
+
+      previewQrImg.src = `/q/${encodeURIComponent(link.id)}/qr?size=9`;
+      previewShortText.textContent = `/q/${link.id}`;
+      previewTargetBadge.textContent = `Destino: ${link.target_url}`;
+
+      btnCopyShort.onclick = () => copyText(fullUrl);
+      btnDownloadPng.onclick = () => {
+        window.location.href = `/q/${encodeURIComponent(link.id)}/qr?size=12&download=1`;
+      };
+      btnDownloadSvg.onclick = () => {
+        window.location.href = `/q/${encodeURIComponent(link.id)}/qr?format=svg&download=1`;
+      };
+      btnTestRedirect.onclick = () => {
+        window.open(fullUrl, "_blank");
+      };
+      btnQuickEditDest.onclick = () => {
+        openEditModal(link.id);
+      };
+
+      qrEmptyState.style.display = "none";
+      qrReadyState.style.display = "flex";
+    }
+
+    createForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      const payload = {
+        target_url: targetUrlInput.value.trim(),
+        title: titleInput.value.trim() || undefined,
+        slug: slugInput.value.trim() || undefined
+      };
+
+      try {
+        const res = await fetch("/api/links", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.detail || "Erro ao criar QR Code");
+          return;
+        }
+
+        toast("QR Code dinâmico criado com sucesso!");
+        createForm.reset();
+        await loadLinks();
+        selectLink(data.id);
+      } catch (err) {
+        toast("Erro ao conectar ao servidor");
+      }
+    });
+
+    window.openEditModal = id => {
+      const link = links.find(l => l.id === id);
+      if (!link) return;
+      editingId = id;
+      editTitleInput.value = link.title;
+      editTargetUrlInput.value = link.target_url;
+      editModal.classList.add("active");
+    };
+
+    function closeEdit() {
+      editModal.classList.remove("active");
+      editingId = null;
+    }
+
+    btnCloseEditModal.addEventListener("click", closeEdit);
+    btnCancelEdit.addEventListener("click", closeEdit);
+
+    editForm.addEventListener("submit", async e => {
+      e.preventDefault();
+      if (!editingId) return;
+
+      try {
+        const res = await fetch(`/api/links/${encodeURIComponent(editingId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: editTitleInput.value.trim(),
+            target_url: editTargetUrlInput.value.trim()
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.detail || "Erro ao atualizar destino");
+          return;
+        }
+
+        toast("Destino atualizado com sucesso!");
+        closeEdit();
+        await loadLinks();
+        if (activeLink && activeLink.id === editingId) {
+          selectLink(editingId);
+        }
+      } catch (err) {
+        toast("Erro ao salvar novo destino");
+      }
+    });
+
+    window.deleteLink = async id => {
+      if (!confirm("Deseja realmente excluir este QR Code?")) return;
+      try {
+        await fetch(`/api/links/${encodeURIComponent(id)}`, { method: "DELETE" });
+        toast("QR Code excluído");
+        await loadLinks();
+        if (activeLink && activeLink.id === id) {
+          qrReadyState.style.display = "none";
+          qrEmptyState.style.display = "flex";
+          activeLink = null;
+        }
+      } catch (err) {
+        toast("Erro ao excluir");
+      }
+    };
+
+    window.copyText = text => {
+      navigator.clipboard.writeText(text).then(() => {
+        toast("Link copiado para a área de transferência!");
+      });
+    };
+
+    loadLinks();
+  </script>
+</body>
+</html>

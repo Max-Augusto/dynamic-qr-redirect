@@ -1,0 +1,8 @@
+{
+  "name": "Dynamic QR Redirect",
+  "description": "Microsserviço e interface web para criação de QR Codes dinâmicos com redirecionamento.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

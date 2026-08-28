@@ -4,14 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Dinâmico — Gerador & Gerenciador Inteligente</title>
-  <meta name="description" content="Crie e gerencie QR Codes dinâmicos que nunca expiram. Altere a URL de destino a qualquer momento ou carregue uma imagem de QR Code existente para editar.">
+  <meta name="description" content="Crie e gerencie QR Codes dinâmicos que nunca expiram. Faça login com o Google para ver todos os seus QR Codes salvos e alterar a URL de destino a qualquer momento.">
   <meta property="og:title" content="QR Dinâmico">
-  <meta property="og:description" content="Gere e gerencie QR Codes dinâmicos com alteração instantânea de link.">
+  <meta property="og:description" content="Gere e gerencie QR Codes dinâmicos com login Google e alteração instantânea de link.">
 
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Firebase Compat SDK for Google Auth -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
   <!-- jsQR for instant client-side QR Code decoding from images -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -79,10 +83,11 @@
     .header-inner {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 14px 24px;
+      padding: 12px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16px;
     }
 
     .brand {
@@ -127,29 +132,102 @@
     .header-nav-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
 
-    .header-badge {
+    /* Google Auth Buttons and Profile */
+    .btn-google-login {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: 0.8rem;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
       font-weight: 600;
-      color: var(--success);
-      background: var(--success-bg);
-      padding: 5px 12px;
-      border-radius: 20px;
-      border: 1px solid #a7f3d0;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.15s ease;
     }
 
-    .status-dot {
-      width: 7px;
-      height: 7px;
-      background: var(--success);
+    .btn-google-login:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    .user-profile-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 4px 6px 4px 10px;
+      border-radius: 30px;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      display: inline-block;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+      object-fit: cover;
+      border: 1px solid var(--border);
+    }
+
+    .user-avatar-fallback {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .user-details {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.1;
+      max-width: 140px;
+    }
+
+    .user-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .user-email {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-logout {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 5px 9px;
+      border-radius: 20px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-logout:hover {
+      background: #fef2f2;
+      color: #ef4444;
+      border-color: #fca5a5;
     }
 
     /* Main Container */
@@ -211,6 +289,50 @@
       background: #ffffff;
       color: var(--text-main);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Auth Banner when not logged in */
+    .auth-prompt-banner {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius-md);
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow-card);
+    }
+
+    .auth-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .auth-banner-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--primary-subtle);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .auth-banner-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .auth-banner-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
     }
 
     /* Two-Column Studio Layout */
@@ -778,7 +900,7 @@
       color: #ef4444;
     }
 
-    /* Clean Destination Edit Modal */
+    /* Modal */
     .modal-backdrop {
       position: fixed;
       top: 0;
@@ -916,6 +1038,10 @@
         padding-top: 12px;
         width: 100%;
       }
+      .auth-prompt-banner {
+        flex-direction: column;
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
@@ -931,10 +1057,27 @@
           <span class="brand-sub">Redirecionador em tempo real</span>
         </div>
       </a>
-      <div class="header-nav-actions">
-        <div class="header-badge">
-          <span class="status-dot"></span>
-          <span>QR Permanente Ativo</span>
+      
+      <div class="header-nav-actions" id="authNavContainer">
+        <!-- Auth state loaded dynamically -->
+        <button type="button" class="btn-google-login" id="btnGoogleLoginNav" style="display: none;">
+          <svg width="17" height="17" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span>Entrar com Google</span>
+        </button>
+
+        <div class="user-profile-chip" id="userProfileChip" style="display: none;">
+          <img id="userAvatarImg" class="user-avatar" src="" alt="Foto">
+          <div id="userAvatarFallback" class="user-avatar-fallback" style="display: none;">U</div>
+          <div class="user-details">
+            <span class="user-name" id="userNameLabel">Usuário</span>
+            <span class="user-email" id="userEmailLabel">usuario@gmail.com</span>
+          </div>
+          <button type="button" class="btn-logout" id="btnLogoutNav" title="Sair da conta">Sair</button>
         </div>
       </div>
     </div>
@@ -942,14 +1085,36 @@
 
   <!-- Main Container -->
   <main>
+
+    <!-- Auth Banner for non-logged users -->
+    <div class="auth-prompt-banner" id="authBanner">
+      <div class="auth-banner-left">
+        <div class="auth-banner-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </div>
+        <div>
+          <div class="auth-banner-title">Entre com sua conta Google</div>
+          <div class="auth-banner-desc">Faça login com 1 clique para sincronizar e gerenciar todos os seus QR Codes permanentemente.</div>
+        </div>
+      </div>
+      <button type="button" class="btn-google-login" id="btnGoogleLoginBanner">
+        <svg width="17" height="17" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span>Entrar com Google</span>
+      </button>
+    </div>
     
     <div class="page-head">
       <div class="page-head-text">
-        <h1>Gerenciador de QR Code Dinâmico</h1>
-        <p>O QR Code impresso nunca muda. Altere a URL de destino quando quiser ou carregue um QR Code para editar.</p>
+        <h1 id="mainTitleHeading">Gerenciador de QR Code Dinâmico</h1>
+        <p>O QR Code impresso nunca muda. Altere a URL de destino a qualquer momento com atualização em tempo real.</p>
       </div>
 
-      <!-- Mode Switch Pills: Criar Novo vs Carregar Existente -->
+      <!-- Mode Switch Pills -->
       <div class="mode-switch-pills">
         <button type="button" class="pill-btn active" id="tabModeCreate">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -1162,8 +1327,10 @@
     <section class="history-section">
       <div class="history-header">
         <div>
-          <h2 class="history-title">Seus QR Codes Ativos</h2>
-          <p style="font-size:0.84rem;color:var(--text-muted);">Clique em um QR Code para pré-visualizar ou editar seu destino final.</p>
+          <h2 class="history-title" id="historySectionTitle">Seus QR Codes Ativos</h2>
+          <p style="font-size:0.84rem;color:var(--text-muted);" id="historySectionSubtitle">
+            Clique em um QR Code para pré-visualizar ou editar seu destino final.
+          </p>
         </div>
         <span class="history-count" id="historyCount">0 links</span>
       </div>
@@ -1217,6 +1384,9 @@
     let links = [];
     let activeLink = null;
     let editingId = null;
+    let currentUser = null;
+    let idToken = null;
+    let authInitialized = false;
 
     // Tabs
     const tabModeCreate = document.getElementById("tabModeCreate");
@@ -1254,6 +1424,8 @@
     // List
     const linksList = document.getElementById("linksList");
     const historyCount = document.getElementById("historyCount");
+    const historySectionTitle = document.getElementById("historySectionTitle");
+    const historySectionSubtitle = document.getElementById("historySectionSubtitle");
 
     // Modal
     const editModal = document.getElementById("editModal");
@@ -1262,6 +1434,17 @@
     const editTargetUrlInput = document.getElementById("editTargetUrlInput");
     const btnCloseEditModal = document.getElementById("btnCloseEditModal");
     const btnCancelEdit = document.getElementById("btnCancelEdit");
+
+    // Auth Elements
+    const btnGoogleLoginNav = document.getElementById("btnGoogleLoginNav");
+    const btnGoogleLoginBanner = document.getElementById("btnGoogleLoginBanner");
+    const authBanner = document.getElementById("authBanner");
+    const userProfileChip = document.getElementById("userProfileChip");
+    const userAvatarImg = document.getElementById("userAvatarImg");
+    const userAvatarFallback = document.getElementById("userAvatarFallback");
+    const userNameLabel = document.getElementById("userNameLabel");
+    const userEmailLabel = document.getElementById("userEmailLabel");
+    const btnLogoutNav = document.getElementById("btnLogoutNav");
 
     // Mode Toggle Tabs
     tabModeCreate.addEventListener("click", () => {
@@ -1292,9 +1475,121 @@
       }[c]));
     }
 
+    // Initialize Firebase
+    async function initAuth() {
+      try {
+        const res = await fetch("/api/config");
+        const data = await res.json();
+        if (data.firebase && data.firebase.apiKey) {
+          if (!firebase.apps.length) {
+            firebase.initializeApp(data.firebase);
+          }
+          authInitialized = true;
+
+          firebase.auth().onAuthStateChanged(async user => {
+            currentUser = user;
+            if (user) {
+              try {
+                idToken = await user.getIdToken();
+              } catch (e) {
+                idToken = null;
+              }
+              renderAuthState(true, user);
+            } else {
+              idToken = null;
+              renderAuthState(false);
+            }
+            await loadLinks();
+          });
+        } else {
+          btnGoogleLoginNav.style.display = "inline-flex";
+          await loadLinks();
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+        btnGoogleLoginNav.style.display = "inline-flex";
+        await loadLinks();
+      }
+    }
+
+    function renderAuthState(isLoggedIn, user) {
+      if (isLoggedIn && user) {
+        btnGoogleLoginNav.style.display = "none";
+        authBanner.style.display = "none";
+        userProfileChip.style.display = "flex";
+
+        userNameLabel.textContent = user.displayName || user.email.split("@")[0];
+        userEmailLabel.textContent = user.email || "";
+
+        if (user.photoURL) {
+          userAvatarImg.src = user.photoURL;
+          userAvatarImg.style.display = "block";
+          userAvatarFallback.style.display = "none";
+        } else {
+          userAvatarImg.style.display = "none";
+          userAvatarFallback.style.display = "grid";
+          userAvatarFallback.textContent = (user.displayName || user.email || "U")[0].toUpperCase();
+        }
+
+        historySectionTitle.textContent = "Seus QR Codes Salvos";
+        historySectionSubtitle.textContent = `Vinculados à sua conta Google (${user.email}).`;
+      } else {
+        btnGoogleLoginNav.style.display = "inline-flex";
+        authBanner.style.display = "flex";
+        userProfileChip.style.display = "none";
+
+        historySectionTitle.textContent = "QR Codes Ativos";
+        historySectionSubtitle.textContent = "Faça login com sua conta Google para salvar e sincronizar seus QR Codes.";
+      }
+    }
+
+    async function loginWithGoogle() {
+      if (!authInitialized) {
+        toast("Autenticação inicializando, aguarde um instante...");
+        return;
+      }
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const result = await firebase.auth().signInWithPopup(provider);
+        toast(`Bem-vindo, ${result.user.displayName || result.user.email}!`);
+      } catch (err) {
+        console.error(err);
+        toast(err.message || "Erro ao conectar com Google");
+      }
+    }
+
+    async function logout() {
+      if (!authInitialized) return;
+      try {
+        await firebase.auth().signOut();
+        toast("Desconectado com sucesso");
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    btnGoogleLoginNav.addEventListener("click", loginWithGoogle);
+    btnGoogleLoginBanner.addEventListener("click", loginWithGoogle);
+    btnLogoutNav.addEventListener("click", logout);
+
+    function getAuthHeaders() {
+      const headers = { "Content-Type": "application/json" };
+      if (idToken) {
+        headers["Authorization"] = `Bearer ${idToken}`;
+      }
+      if (currentUser) {
+        headers["x-user-uid"] = currentUser.uid;
+        headers["x-user-email"] = currentUser.email;
+      }
+      return headers;
+    }
+
     async function loadLinks() {
       try {
-        const res = await fetch("/api/links");
+        const res = await fetch("/api/links", {
+          headers: getAuthHeaders()
+        });
         links = await res.json();
         renderLinks();
       } catch (err) {
@@ -1308,7 +1603,7 @@
       if (!links.length) {
         linksList.innerHTML = `
           <div style="background:#ffffff;border:1px dashed var(--border);border-radius:var(--radius-lg);padding:36px;text-align:center;color:var(--text-muted);">
-            Nenhum QR Code criado ainda. Utilize o formulário acima para gerar o primeiro.
+            Nenhum QR Code encontrado. Utilize o formulário acima para gerar o seu primeiro código permanente.
           </div>
         `;
         return;
@@ -1413,7 +1708,7 @@
       try {
         const res = await fetch("/api/links", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload)
         });
 
@@ -1488,7 +1783,6 @@
 
     function extractSlug(raw) {
       let trimmed = raw.trim();
-      // Look for /q/slug or slug directly
       if (trimmed.includes("/q/")) {
         const parts = trimmed.split("/q/");
         return parts[parts.length - 1].split("/")[0].split("?")[0];
@@ -1521,14 +1815,23 @@
       findAndOpenLink(slug);
     });
 
-    function findAndOpenLink(slug) {
-      const link = links.find(l => l.id.toLowerCase() === slug.toLowerCase());
+    async function findAndOpenLink(slug) {
+      let link = links.find(l => l.id.toLowerCase() === slug.toLowerCase());
+      if (!link) {
+        try {
+          const res = await fetch(`/api/links/${encodeURIComponent(slug)}`);
+          if (res.ok) {
+            link = await res.json();
+          }
+        } catch (e) {}
+      }
+
       if (link) {
         toast(`QR Code "${link.title}" localizado com sucesso!`);
         selectLink(link.id);
         openEditModal(link.id);
       } else {
-        toast(`QR Code com código "${slug}" não encontrado no sistema.`);
+        toast(`QR Code com código "${slug}" não encontrado.`);
       }
     }
 
@@ -1556,7 +1859,7 @@
       try {
         const res = await fetch(`/api/links/${encodeURIComponent(editingId)}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             title: editTitleInput.value.trim(),
             target_url: editTargetUrlInput.value.trim()
@@ -1583,7 +1886,15 @@
     window.deleteLink = async id => {
       if (!confirm("Deseja realmente excluir este QR Code?")) return;
       try {
-        await fetch(`/api/links/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const res = await fetch(`/api/links/${encodeURIComponent(id)}`, { 
+          method: "DELETE",
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) {
+          const d = await res.json();
+          toast(d.detail || "Erro ao excluir");
+          return;
+        }
         toast("QR Code excluído");
         await loadLinks();
         if (activeLink && activeLink.id === id) {
@@ -1600,7 +1911,8 @@
       });
     };
 
-    loadLinks();
+    // Start App
+    initAuth();
   </script>
 </body>
 </html>

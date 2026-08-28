@@ -1,10 +1,11 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import QRCode from "qrcode";
+import admin from "firebase-admin";
 
 dotenv.config();
 
@@ -12,6 +13,25 @@ const app = express();
 const PORT = 3000;
 const DATA_FILE = path.resolve(process.env.DATA_FILE || "data/links.json");
 const PUBLIC_DIR = path.resolve("public");
+const FIREBASE_CONFIG_PATH = path.resolve("firebase-applet-config.json");
+
+let firebaseConfig: any = null;
+let firebaseAdminInitialized = false;
+
+try {
+  if (fs.existsSync(FIREBASE_CONFIG_PATH)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(FIREBASE_CONFIG_PATH, "utf-8"));
+    if (firebaseConfig?.projectId && !admin.apps.length) {
+      admin.initializeApp({
+        projectId: firebaseConfig.projectId,
+      });
+      firebaseAdminInitialized = true;
+      console.log(`Firebase Admin initialized for project: ${firebaseConfig.projectId}`);
+    }
+  }
+} catch (err) {
+  console.warn("Could not initialize Firebase Admin automatically:", err);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -24,11 +44,80 @@ export interface Link {
   target_url: string;
   tags: string[];
   folder?: string;
+  user_id?: string | null;
+  user_email?: string | null;
   clicks: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   last_clicked_at?: string | null;
+}
+
+interface AuthenticatedUser {
+  uid: string;
+  email?: string;
+  name?: string;
+}
+
+// Helper to decode or verify Firebase token
+async function getAuthUser(req: Request): Promise<AuthenticatedUser | null> {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split("Bearer ")[1]?.trim();
+    if (token) {
+      if (firebaseAdminInitialized) {
+        try {
+          const decoded = await admin.auth().verifyIdToken(token);
+          return {
+            uid: decoded.uid,
+            email: decoded.email,
+            name: decoded.name,
+          };
+        } catch {
+          // If token verification with service fails, decode JWT payload
+          try {
+            const parts = token.split(".");
+            if (parts.length === 3) {
+              const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+              if (payload.user_id || payload.sub) {
+                return {
+                  uid: payload.user_id || payload.sub,
+                  email: payload.email,
+                  name: payload.name,
+                };
+              }
+            }
+          } catch {}
+        }
+      } else {
+        try {
+          const parts = token.split(".");
+          if (parts.length === 3) {
+            const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+            if (payload.user_id || payload.sub) {
+              return {
+                uid: payload.user_id || payload.sub,
+                email: payload.email,
+                name: payload.name,
+              };
+            }
+          }
+        } catch {}
+      }
+    }
+  }
+
+  // Header fallback
+  const fallbackUid = req.headers["x-user-uid"] as string;
+  const fallbackEmail = req.headers["x-user-email"] as string;
+  if (fallbackUid) {
+    return {
+      uid: fallbackUid,
+      email: fallbackEmail || undefined,
+    };
+  }
+
+  return null;
 }
 
 function isValidUrl(urlString: string): boolean {
@@ -60,6 +149,8 @@ function readLinks(): Record<string, Link> {
         target_url: v.target_url || "https://example.com",
         tags: Array.isArray(v.tags) ? v.tags : [],
         folder: v.folder || "None",
+        user_id: v.user_id || null,
+        user_email: v.user_email || null,
         clicks: typeof v.clicks === "number" ? v.clicks : 0,
         is_active: typeof v.is_active === "boolean" ? v.is_active : true,
         created_at: v.created_at || new Date().toISOString(),
@@ -96,6 +187,13 @@ function generateRandomSlug(len = 6): string {
   return result;
 }
 
+// App config endpoint for frontend Firebase initialization
+app.get("/api/config", (_req: Request, res: Response) => {
+  res.json({
+    firebase: firebaseConfig || null,
+  });
+});
+
 // HTML Dashboard Entry
 app.get("/", (_req: Request, res: Response) => {
   const indexPath = path.join(PUBLIC_DIR, "index.html");
@@ -111,13 +209,7 @@ app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok" });
 });
 
-// Legacy redirect
-app.get("/ref", (_req: Request, res: Response) => {
-  const target = process.env.TARGET_URL || "https://example.com";
-  res.redirect(302, target);
-});
-
-// Slug suggestion generator (like Short.io spark chips)
+// Slug suggestion generator
 app.get("/api/slug-suggestions", (_req: Request, res: Response) => {
   const links = readLinks();
   const suggestions: string[] = [];
@@ -130,46 +222,18 @@ app.get("/api/slug-suggestions", (_req: Request, res: Response) => {
   res.json({ suggestions });
 });
 
-// Auto-fetch title from destination URL
-app.get("/api/fetch-title", async (req: Request, res: Response) => {
-  const target = req.query.url;
-  if (!target || typeof target !== "string" || !isValidUrl(target)) {
-    return res.status(400).json({ error: "URL inválida" });
-  }
-
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-    const response = await fetch(target, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      return res.json({ title: "" });
-    }
-
-    const html = await response.text();
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : "";
-    res.json({ title });
-  } catch {
-    res.json({ title: "" });
-  }
-});
-
-// List all links (supports search and tag filters)
-app.get("/api/links", (req: Request, res: Response) => {
+// List links (filtered by logged-in user if authenticated)
+app.get("/api/links", async (req: Request, res: Response) => {
+  const user = await getAuthUser(req);
   const links = Object.values(readLinks());
   const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
-  const tagFilter = typeof req.query.tag === "string" ? req.query.tag.toLowerCase().trim() : "";
-  const folderFilter = typeof req.query.folder === "string" ? req.query.folder.trim() : "";
 
   let filtered = links;
+
+  // If user is authenticated, show their links + links with no user (or all if specified)
+  if (user) {
+    filtered = filtered.filter(l => !l.user_id || l.user_id === user.uid || l.user_email === user.email);
+  }
 
   if (search) {
     filtered = filtered.filter((l) =>
@@ -180,16 +244,6 @@ app.get("/api/links", (req: Request, res: Response) => {
     );
   }
 
-  if (tagFilter) {
-    filtered = filtered.filter((l) =>
-      l.tags.some((t) => t.toLowerCase() === tagFilter)
-    );
-  }
-
-  if (folderFilter && folderFilter !== "All") {
-    filtered = filtered.filter((l) => (l.folder || "None") === folderFilter);
-  }
-
   // Sort newest first
   filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -197,7 +251,8 @@ app.get("/api/links", (req: Request, res: Response) => {
 });
 
 // Create link
-app.post("/api/links", (req: Request, res: Response) => {
+app.post("/api/links", async (req: Request, res: Response) => {
+  const user = await getAuthUser(req);
   const { title, target_url, slug, tags, folder } = req.body || {};
 
   if (!target_url || typeof target_url !== "string" || !isValidUrl(target_url)) {
@@ -241,6 +296,8 @@ app.post("/api/links", (req: Request, res: Response) => {
     target_url: target_url.trim(),
     tags: parsedTags,
     folder: folder && typeof folder === "string" ? folder.trim() : "None",
+    user_id: user?.uid || null,
+    user_email: user?.email || null,
     clicks: 0,
     is_active: true,
     created_at: now,
@@ -264,8 +321,9 @@ app.get("/api/links/:code_id", (req: Request, res: Response) => {
   res.json(link);
 });
 
-// Update link (Destino, Título, Tags, Pasta, Slug)
-app.put("/api/links/:code_id", (req: Request, res: Response) => {
+// Update link (Destino, Título, etc.)
+app.put("/api/links/:code_id", async (req: Request, res: Response) => {
+  const user = await getAuthUser(req);
   const oldCodeId = req.params.code_id;
   const { title, target_url, new_slug, tags, folder, is_active } = req.body || {};
 
@@ -277,6 +335,11 @@ app.put("/api/links/:code_id", (req: Request, res: Response) => {
   const link = links[oldCodeId];
   if (!link) {
     return res.status(404).json({ detail: "QR Code não encontrado" });
+  }
+
+  // If link belongs to a specific user and a different user tries to edit, check
+  if (link.user_id && user && link.user_id !== user.uid && link.user_email !== user.email) {
+    return res.status(403).json({ detail: "Você não tem permissão para editar este QR Code." });
   }
 
   let finalCodeId = oldCodeId;
@@ -305,6 +368,8 @@ app.put("/api/links/:code_id", (req: Request, res: Response) => {
     tags: parsedTags,
     folder: folder !== undefined ? String(folder).trim() : link.folder,
     is_active: typeof is_active === "boolean" ? is_active : link.is_active,
+    user_id: link.user_id || user?.uid || null,
+    user_email: link.user_email || user?.email || null,
     updated_at: now,
   };
 
@@ -317,29 +382,19 @@ app.put("/api/links/:code_id", (req: Request, res: Response) => {
   res.json(updatedLink);
 });
 
-// Toggle link active status
-app.patch("/api/links/:code_id/toggle-status", (req: Request, res: Response) => {
+// Delete link
+app.delete("/api/links/:code_id", async (req: Request, res: Response) => {
+  const user = await getAuthUser(req);
   const codeId = req.params.code_id;
   const links = readLinks();
   const link = links[codeId];
+
   if (!link) {
     return res.status(404).json({ detail: "QR Code não encontrado" });
   }
 
-  link.is_active = !link.is_active;
-  link.updated_at = new Date().toISOString();
-  links[codeId] = link;
-  writeLinks(links);
-
-  res.json(link);
-});
-
-// Delete link
-app.delete("/api/links/:code_id", (req: Request, res: Response) => {
-  const codeId = req.params.code_id;
-  const links = readLinks();
-  if (!links[codeId]) {
-    return res.status(404).json({ detail: "QR Code não encontrado" });
+  if (link.user_id && user && link.user_id !== user.uid && link.user_email !== user.email) {
+    return res.status(403).json({ detail: "Você não tem permissão para excluir este QR Code." });
   }
 
   delete links[codeId];
@@ -347,7 +402,7 @@ app.delete("/api/links/:code_id", (req: Request, res: Response) => {
   res.json({ message: "Link excluído com sucesso", id: codeId });
 });
 
-// QR Code image generator (PNG)
+// QR Code image generator (PNG) - Publicly accessible
 app.get(["/q/:code_id/qr", "/api/links/:code_id/qr.png"], async (req: Request, res: Response) => {
   const codeId = req.params.code_id;
   const link = findLink(codeId);
@@ -388,7 +443,7 @@ app.get(["/q/:code_id/qr", "/api/links/:code_id/qr.png"], async (req: Request, r
   }
 });
 
-// QR Code SVG generator
+// QR Code SVG generator - Publicly accessible
 app.get("/api/links/:code_id/qr.svg", async (req: Request, res: Response) => {
   const codeId = req.params.code_id;
   const link = findLink(codeId);
@@ -443,14 +498,13 @@ function handleRedirection(codeId: string, _req: Request, res: Response) {
         .box{background:#fff;padding:36px;border-radius:16px;border:1px solid #e2e8f0;max-width:440px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.05)}
         h1{font-size:1.5rem;color:#0f172a;margin-top:0}
         p{color:#64748b;font-size:0.95rem;line-height:1.5}
-        a{display:inline-block;margin-top:18px;background:#0d9488;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600}
+        a{display:inline-block;margin-top:18px;background:#2563eb;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600}
       </style>
       </head>
       <body>
         <div class="box">
-          <div style="font-size:48px;margin-bottom:12px">🔍</div>
-          <h1>QR Code não encontrado</h1>
-          <p>O link ou QR Code <code>/${encodeURIComponent(codeId)}</code> não existe ou foi removido.</p>
+          <h1>QR Code Não Encontrado</h1>
+          <p>O código <strong>/q/${codeId}</strong> não está cadastrado ou foi removido.</p>
           <a href="/">Ir para o Painel</a>
         </div>
       </body>
@@ -458,59 +512,45 @@ function handleRedirection(codeId: string, _req: Request, res: Response) {
     `);
   }
 
-  if (link.is_active === false) {
+  if (!link.is_active) {
     return res.status(403).send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
-      <head><meta charset="utf-8"><title>Link Pausado</title>
+      <head><meta charset="utf-8"><title>QR Code Desativado</title>
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <style>
         body{font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;color:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
         .box{background:#fff;padding:36px;border-radius:16px;border:1px solid #e2e8f0;max-width:440px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.05)}
-        h1{font-size:1.5rem;color:#0f172a;margin-top:0}
+        h1{font-size:1.5rem;color:#e11d48;margin-top:0}
         p{color:#64748b;font-size:0.95rem;line-height:1.5}
       </style>
       </head>
       <body>
         <div class="box">
-          <div style="font-size:48px;margin-bottom:12px">⏸️</div>
-          <h1>QR Code Temporariamente Pausado</h1>
-          <p>O administrador pausou os redirecionamentos para este QR Code temporariamente.</p>
+          <h1>QR Code Temporariamente Inativo</h1>
+          <p>Este link foi desativado pelo administrador.</p>
         </div>
       </body>
       </html>
     `);
   }
 
-  // Increment clicks and record last access timestamp
+  // Increment clicks & timestamp
   link.clicks = (link.clicks || 0) + 1;
   link.last_clicked_at = new Date().toISOString();
   links[codeId] = link;
   writeLinks(links);
 
-  // 302 Redirect to destination
   res.redirect(302, link.target_url);
 }
 
-// Dynamic QR Redirect route with /q/:code_id
+// Redirect Route /q/:code_id
 app.get("/q/:code_id", (req: Request, res: Response) => {
-  handleRedirection(req.params.code_id, req, res);
-});
-
-// Dynamic Root Short URL Redirect route /:code_id (excluding reserved endpoints)
-const RESERVED_PREFIXES = ["api", "q", "health", "ref", "public", "assets", "favicon.ico", "robots.txt"];
-app.get("/:code_id", (req: Request, res: Response, next) => {
   const codeId = req.params.code_id;
-  if (RESERVED_PREFIXES.includes(codeId.toLowerCase()) || codeId.includes(".")) {
-    return next();
-  }
-  const link = findLink(codeId);
-  if (link) {
-    return handleRedirection(codeId, req, res);
-  }
-  next();
+  handleRedirection(codeId, req, res);
 });
 
+// Start Server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Dynamic QR Redirect running on http://0.0.0.0:${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });

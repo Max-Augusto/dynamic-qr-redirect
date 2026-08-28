@@ -1,0 +1,1 @@
+"""Aplicação FastAPI do redirecionador de QR Code dinâmico."""

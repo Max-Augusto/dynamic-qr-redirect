@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>QR Dinâmico — Gerador & Gerenciador Inteligente</title>
-  <meta name="description" content="Crie e gerencie QR Codes dinâmicos que nunca expiram. Faça login com o Google para ver todos os seus QR Codes salvos e alterar a URL de destino a qualquer momento.">
+  <meta name="description" content="Crie e gerencie QR Codes dinâmicos com proteção contra links maliciosos, redirecionamento seguro e login com o Google.">
   <meta property="og:title" content="QR Dinâmico">
-  <meta property="og:description" content="Gere e gerencie QR Codes dinâmicos com login Google e alteração instantânea de link.">
+  <meta property="og:description" content="Gere e gerencie QR Codes dinâmicos com proteção e alteração instantânea de destino.">
   <meta name="theme-color" content="#ffffff">
 
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
@@ -38,6 +38,7 @@
       --border-focus: #3b82f6;
       
       --success: #10b981;
+      --success-bg: #ecfdf5;
       --danger: #ef4444;
       --danger-bg: #fef2f2;
       
@@ -78,7 +79,7 @@
       color: inherit;
     }
 
-    /* Top Navigation - Ultra compact */
+    /* Top Navigation */
     header {
       background: #ffffff;
       border-bottom: 1px solid var(--border);
@@ -240,6 +241,20 @@
       color: var(--text-muted);
       font-size: 0.8rem;
       line-height: 1.35;
+    }
+
+    .security-badge-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--success-bg);
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-top: 4px;
     }
 
     /* Tabs Segmented Control */
@@ -579,12 +594,6 @@
       color: var(--primary);
     }
 
-    .btn-tool.reset {
-      grid-column: span 2;
-      background: #f8fafc;
-      color: var(--text-muted);
-    }
-
     /* History / Management List */
     .history-section {
       width: 100%;
@@ -861,6 +870,11 @@
       animation: slideUp 0.2s ease;
       pointer-events: auto;
       text-align: center;
+      max-width: 90%;
+    }
+
+    .toast-message.error {
+      background: #b91c1c;
     }
 
     @keyframes slideUp {
@@ -917,6 +931,10 @@
     <div class="hero-box">
       <h1 id="mainTitleHeading">Gerenciador de QR Code</h1>
       <p>O QR Code impresso nunca muda. Altere a URL de destino a qualquer momento.</p>
+      <div class="security-badge-row">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <span>Protegido com Rate-Limit &amp; Validação Anti-SSRF</span>
+      </div>
     </div>
 
     <!-- Segmented Tabs -->
@@ -954,6 +972,7 @@
                 class="input-field" 
                 placeholder="https://exemplo.com/meu-cardapio" 
                 required
+                maxlength="2048"
                 autocomplete="off"
               >
             </div>
@@ -1025,6 +1044,7 @@
                   type="text" 
                   id="searchSlugInput" 
                   placeholder="ex: cardapio" 
+                  maxlength="64"
                   required
                 >
               </div>
@@ -1127,7 +1147,7 @@
 
           <div class="form-group">
             <label class="form-label" for="editTargetUrlInput">Novo Link de Destino</label>
-            <input type="url" id="editTargetUrlInput" class="input-field" placeholder="https://novo-link.com" required>
+            <input type="url" id="editTargetUrlInput" class="input-field" placeholder="https://novo-link.com" maxlength="2048" required>
           </div>
         </div>
 
@@ -1211,12 +1231,12 @@
       importView.style.display = "block";
     });
 
-    function toast(text) {
+    function toast(text, isError = false) {
       const el = document.createElement("div");
-      el.className = "toast-message";
+      el.className = `toast-message ${isError ? 'error' : ''}`;
       el.textContent = text;
       document.getElementById("toastContainer").appendChild(el);
-      setTimeout(() => el.remove(), 2600);
+      setTimeout(() => el.remove(), 3200);
     }
 
     function esc(s) {
@@ -1290,7 +1310,7 @@
         const result = await firebase.auth().signInWithPopup(provider);
         toast(`Bem-vindo, ${result.user.displayName || result.user.email}!`);
       } catch (err) {
-        toast("Erro ao conectar com Google");
+        toast("Erro ao conectar com Google", true);
       }
     }
 
@@ -1314,6 +1334,10 @@
     async function loadLinks() {
       try {
         const res = await fetch("/api/links", { headers: getAuthHeaders() });
+        if (res.status === 429) {
+          toast("Muitas requisições. Aguarde um momento.", true);
+          return;
+        }
         links = await res.json();
         renderLinks();
       } catch (err) {}
@@ -1357,7 +1381,7 @@
             <div class="item-actions-row">
               <span class="scan-badge">${link.clicks || 0} scans</span>
               <button class="btn-edit-inline" onclick="openEditModal('${esc(link.id)}')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 Alterar Destino
               </button>
               <button class="btn-icon-small" onclick="copyText('${fullShortUrl}')" title="Copiar Link">
@@ -1424,8 +1448,16 @@
 
     createForm.addEventListener("submit", async e => {
       e.preventDefault();
+      const targetUrl = targetUrlInput.value.trim();
+
+      // Client-side quick protocol validation
+      if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+        toast("O link deve começar com http:// ou https://", true);
+        return;
+      }
+
       const payload = {
-        target_url: targetUrlInput.value.trim(),
+        target_url: targetUrl,
         title: titleInput.value.trim() || undefined,
         slug: slugInput.value.trim() || undefined
       };
@@ -1439,16 +1471,16 @@
 
         const data = await res.json();
         if (!res.ok) {
-          toast(data.detail || "Erro ao criar QR Code");
+          toast(data.detail || data.error || "Erro ao criar QR Code", true);
           return;
         }
 
-        toast("QR Code criado!");
+        toast("QR Code criado com segurança!");
         createForm.reset();
         await loadLinks();
         selectLink(data.id);
       } catch (err) {
-        toast("Erro no servidor");
+        toast("Erro de conexão com o servidor", true);
       }
     });
 
@@ -1476,7 +1508,7 @@
             if (code && code.data) {
               handleDecodedUrl(code.data);
             } else {
-              toast("Não foi possível ler o QR. Tente uma foto mais nítida.");
+              toast("Não foi possível ler o QR. Tente uma foto mais nítida.", true);
             }
           }
         };
@@ -1496,7 +1528,7 @@
 
     function handleDecodedUrl(raw) {
       const slug = extractSlug(raw);
-      if (!slug) return toast("Código não identificado");
+      if (!slug) return toast("Código não identificado", true);
       findAndOpenLink(slug);
     }
 
@@ -1514,7 +1546,7 @@
         selectLink(link.id);
         openEditModal(link.id);
       } else {
-        toast(`Código "${slug}" não encontrado.`);
+        toast(`Código "${slug}" não encontrado.`, true);
       }
     }
 
@@ -1551,33 +1583,38 @@
 
         const data = await res.json();
         if (!res.ok) {
-          toast(data.detail || "Erro ao salvar");
+          toast(data.detail || "Erro ao salvar", true);
           return;
         }
 
-        toast("Destino atualizado!");
+        toast("Destino atualizado com sucesso!");
         closeEdit();
         await loadLinks();
         if (activeLink && activeLink.id === editingId) {
           selectLink(editingId);
         }
       } catch (err) {
-        toast("Erro ao salvar");
+        toast("Erro ao salvar alterações", true);
       }
     });
 
     window.deleteLink = async id => {
-      if (!confirm("Excluir este QR Code?")) return;
+      if (!confirm("Excluir este QR Code permanentemente?")) return;
       try {
         const res = await fetch(`/api/links/${encodeURIComponent(id)}`, { 
           method: "DELETE",
           headers: getAuthHeaders()
         });
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.detail || "Erro ao excluir", true);
+          return;
+        }
         toast("QR Code excluído");
         await loadLinks();
         if (activeLink && activeLink.id === id) resetPreview();
       } catch (err) {
-        toast("Erro ao excluir");
+        toast("Erro ao excluir", true);
       }
     };
 
@@ -1585,7 +1622,7 @@
       navigator.clipboard.writeText(text).then(() => {
         toast("Link copiado!");
       }).catch(() => {
-        toast("Não foi possível copiar.");
+        toast("Não foi possível copiar.", true);
       });
     };
 

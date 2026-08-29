@@ -1,0 +1,6 @@
+# Ignora arquivos HTML no cálculo de linguagens
+*.html linguist-detectable=false
+
+# Se você tiver uma pasta de templates/front-end, ignore-a inteira:
+templates/* linguist-vendored
+static/* linguist-vendored

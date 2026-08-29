@@ -1,8 +1,5 @@
 # Dynamic QR Redirect
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Tests](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](https://pytest.org/)
 
 Microsserviço FastAPI para QR Codes dinâmicos. O QR Code aponta para `/ref` e o destino pode ser alterado no servidor por meio de `TARGET_URL`, sem precisar gerar uma nova imagem.
 
